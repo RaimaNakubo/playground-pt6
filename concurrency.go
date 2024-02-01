@@ -1,19 +1,28 @@
 package main
 
-import (
-	"fmt"
-	"time"
-)
+import "fmt"
 
 func main() {
-	go say("world") //calling say() in another goroutine
-	say("hello")    //calling say() in current goroutine
+	s := []int{7, 2, 8, -9, 4, 0} //input data in a slice of int
+
+	c := make(chan int) //creating int channel
+
+	go sum(s[:len(s)/2], c) //summary of the first half of a slice calculates in 2nd goroutine
+	go sum(s[len(s)/2:], c) //summary of the second half of a slice calculates in 3rd goroutine
+
+	x, y := <-c, <-c //recieving first and second calculation results from int channel
+
+	//here x recieved result of the second half calculation bc calculation have been finished faster than the first half
+	//final calculation happens once both goroutines have completed their's calculations
+	fmt.Printf("Summary of: first half - %v, second half - %v, combined - %v", x, y, x+y)
+
 }
 
-// function say() prints it's argument five times with 100ms delay
-func say(s string) {
-	for i := 0; i < 5; i++ {
-		time.Sleep(100 * time.Millisecond)
-		fmt.Println(s)
+// function sum summarizes all values inside argument's slice and sends the summary to integer channel
+func sum(s []int, c chan int) {
+	sum := 0
+	for _, v := range s {
+		sum += v //calculating summary
 	}
+	c <- sum //sending summary to the int channel from argument
 }
