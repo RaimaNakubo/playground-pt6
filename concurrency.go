@@ -35,6 +35,20 @@ func main() {
 	for i := range ch2 { //until channel ch2 is closed
 		fmt.Println(i) //printing data from channel
 	}
+	fmt.Println()
+
+	//Select
+	ch3 := make(chan int)  //ch3 is an integer channel without buffer; used for transfering calculations
+	quit := make(chan int) //quit is an integer channel without buffer; used to stop calculation process
+
+	go func() { //async function call in sub-goroutine
+		for i := 0; i < 10; i++ {
+			fmt.Println(<-ch3) //which prints 10 values from channel ch3
+		}
+		quit <- 0 //then sends a signal to stop calculations
+	}()
+
+	selectFibonacchi(ch3, quit) //calling calculating function in general goroutine
 
 }
 
@@ -55,4 +69,20 @@ func fibonacchi(n int, c chan int) {
 		x, y = y, x+y
 	}
 	close(c) //closing int channel as there would be no more values send
+}
+
+// sunction selectFibonacchi() calculates Fibonacchi row for n numbers,
+// sending them repetedly to int channel from argument 1,
+// until some data appears in int channel from argument 2
+func selectFibonacchi(c, quit chan int) {
+	x, y := 0, 1
+	for {
+		select {
+		case c <- x:
+			x, y = y, x+y
+		case <-quit:
+			fmt.Println("quit")
+			return
+		}
+	}
 }
