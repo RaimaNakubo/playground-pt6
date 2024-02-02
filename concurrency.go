@@ -1,6 +1,9 @@
 package main
 
-import "fmt"
+import (
+	"fmt"
+	"time"
+)
 
 func main() {
 	//channels
@@ -49,6 +52,26 @@ func main() {
 	}()
 
 	selectFibonacchi(ch3, quit) //calling calculating function in general goroutine
+	fmt.Println()
+
+	//default selection
+	tick := time.Tick(100 * time.Millisecond) // tick is a ticking time.Time channel that recieves current time every (100ms) which is
+	//(units of time passed in current goroutine)
+	boom := time.After(500 * time.Millisecond) // boom is a time.Time channel that recieves current time after (duration) have been elapsed
+
+	for {
+		select {
+		case <-tick: //if tick happened
+			fmt.Println("tick.")
+		case <-boom: //if boom happened
+			fmt.Println("BOOM!")
+			return //loop ends
+		default: //if nothing happened
+			fmt.Println("nothing..")
+			time.Sleep(50 * time.Millisecond) //pause this goroutine for 50ms
+		}
+
+	}
 
 }
 
