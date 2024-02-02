@@ -1,111 +1,117 @@
+/*
+Exercise: Equivalent Binary Trees
+1. Implement the Walk function.
+
+2. Test the Walk function.
+
+The function tree.New(k) constructs a randomly-structured (but always sorted) binary tree holding the values k, 2k, 3k, ..., 10k.
+
+Create a new channel ch and kick off the walker:
+
+go Walk(tree.New(1), ch)
+Then read and print 10 values from the channel. It should be the numbers 1, 2, 3, ..., 10.
+
+3. Implement the Same function using Walk to determine whether t1 and t2 store the same values.
+
+4. Test the Same function.
+
+Same(tree.New(1), tree.New(1)) should return true, and Same(tree.New(1), tree.New(2)) should return false.
+
+Doc for Tree package - https://pkg.go.dev/golang.org/x/tour/tree#Tree
+*/
+
 package main
 
 import (
 	"fmt"
-	"time"
+
+	"golang.org/x/tour/tree"
 )
 
 func main() {
-	//channels
-	s := []int{7, 2, 8, -9, 4, 0} //input data in a slice of int
 
-	c := make(chan int) //creating int channel
-
-	go sum(s[:len(s)/2], c) //summary of the first half of a slice calculates in 2nd goroutine
-	go sum(s[len(s)/2:], c) //summary of the second half of a slice calculates in 3rd goroutine
-
-	x, y := <-c, <-c //recieving first and second calculation results from int channel
-
-	//here x recieved result of the second half calculation bc calculation have been finished faster than the first half
-	//final calculation happens once both goroutines have completed their's calculations
-	fmt.Printf("Summary of: first half - %v, second half - %v, combined - %v\n", x, y, x+y)
-	fmt.Println()
-
-	//buffered channels
-	ch := make(chan int, 2) //ch is an integer channel with buffer == 2
-	ch <- 1
-	ch <- 2
-	//ch <- 3 fatal error: all goroutines are asleep - deadlock! - goroutine 1 [chan send]
-	fmt.Println(<-ch)
-	fmt.Println(<-ch)
-	//fmt.Println(<-ch) fatal error: all goroutines are asleep - deadlock! - goroutine 1 [chan receive]
-	fmt.Println()
-
-	//Range and Close
-	ch2 := make(chan int, 10)    //ch2 is an integer channel with buffer == 10
-	go fibonacchi(cap(ch2), ch2) //calculating n == capacity of ch2 == buffer numbers of Fibonacchi in a separate goroutine
-
-	for i := range ch2 { //until channel ch2 is closed
-		fmt.Println(i) //printing data from channel
+	//testing Walk() in another goroutine
+	ch := make(chan int)
+	go Walk(tree.New(1), ch)
+	for i := range ch {
+		fmt.Println(i)
 	}
 	fmt.Println()
 
-	//Select
-	ch3 := make(chan int)  //ch3 is an integer channel without buffer; used for transfering calculations
-	quit := make(chan int) //quit is an integer channel without buffer; used to stop calculation process
-
-	go func() { //async function call in sub-goroutine
-		for i := 0; i < 10; i++ {
-			fmt.Println(<-ch3) //which prints 10 values from channel ch3
-		}
-		quit <- 0 //then sends a signal to stop calculations
-	}()
-
-	selectFibonacchi(ch3, quit) //calling calculating function in general goroutine
+	ch = make(chan int) //have to create a new channel bc Walk() closes it
+	go Walk(tree.New(3), ch)
+	for i := range ch {
+		fmt.Println(i)
+	}
 	fmt.Println()
 
-	//default selection
-	tick := time.Tick(100 * time.Millisecond) // tick is a ticking time.Time channel that recieves current time every (100ms) which is
-	//(units of time passed in current goroutine)
-	boom := time.After(500 * time.Millisecond) // boom is a time.Time channel that recieves current time after (duration) have been elapsed
+	//testing Same() with not necessarely identical trees, but with the same values for nodes total;
+	//different arrangement, but same values
+	k := 3                                // k is a multiplier for values of a tree
+	res := Same(tree.New(k), tree.New(k)) //exp r true
+	fmt.Println(res)
 
-	for {
-		select {
-		case <-tick: //if tick happened
-			fmt.Println("tick.")
-		case <-boom: //if boom happened
-			fmt.Println("BOOM!")
-			return //loop ends
-		default: //if nothing happened
-			fmt.Println("nothing..")
-			time.Sleep(50 * time.Millisecond) //pause this goroutine for 50ms
-		}
-
-	}
-
+	//different arrangement, different values
+	res = Same(tree.New(k), tree.New(1)) //exp r false
+	fmt.Println(res)
 }
 
-// function sum summarizes all values inside argument's slice and sends the summary to integer channel
-func sum(s []int, c chan int) {
-	sum := 0
-	for _, v := range s {
-		sum += v //calculating summary
-	}
-	c <- sum //sending summary to the int channel from argument
-}
+// function Walk() walks the tree t sending all values from the tree to the channel ch and closes ch.
+func Walk(t *tree.Tree, ch chan int) {
+	defer close(ch) //before Walk() returns close the channel
 
-// function fibonacchi() calculates Fibonacchi row for n numbers from argument 1 and send them to int channel from argument 2
-func fibonacchi(n int, c chan int) {
-	x, y := 0, 1
-	for i := 0; i < n; i++ {
-		c <- x
-		x, y = y, x+y
-	}
-	close(c) //closing int channel as there would be no more values send
-}
+	var nodeSearch func(t *tree.Tree) //defining a recursive function that searches for existing nodes in the tree
 
-// sunction selectFibonacchi() calculates Fibonacchi row for n numbers,
-// sending them repetedly to int channel from argument 1,
-// until some data appears in int channel from argument 2
-func selectFibonacchi(c, quit chan int) {
-	x, y := 0, 1
-	for {
-		select {
-		case c <- x:
-			x, y = y, x+y
-		case <-quit:
-			fmt.Println("quit")
+	//nodeSearch acts like a container for all the recursive calls
+	nodeSearch = func(t *tree.Tree) {
+		//if there is no node then search stops
+		if t == nil {
+			//fmt.Println("There is no node")
 			return
+		} /*else {
+			fmt.Printf("There is a node: %v\n", t.Value)
+		}
+
+		if t.Left != nil {
+			fmt.Printf("There is a node on the left: %v\n", t.Left.Value)
+		} else {
+			fmt.Println("There is no node on the left")
+		}
+		if t.Right != nil {
+			fmt.Printf("There is a node on the right: %v\n", t.Right.Value)
+		} else {
+			fmt.Println("There is no node on the right")
+		}*/
+
+		//if there is a node then
+		nodeSearch(t.Left) //search for node on the left
+		ch <- t.Value      //send node's value to the channel
+		//fmt.Printf("a node have been sent to the channel: %v\n", t.Value)
+		nodeSearch(t.Right) //search for node on the right
+	}
+
+	nodeSearch(t) //calling recursive function to search for nodes in tree t
+
+}
+
+// function Same() determines whether the trees t1 and t2 contain the same values.
+func Same(t1, t2 *tree.Tree) bool {
+	//channels ch1 and ch2 are recievers for data from binary trees
+	ch1 := make(chan int)
+	ch2 := make(chan int)
+
+	//calling Walk() in separate goroutines which simultaneously sends data from trees to channels
+	go Walk(t1, ch1)
+	go Walk(t2, ch2)
+
+	for v1 := range ch1 { //while first channel is open
+		if v1 != <-ch2 { //compare all recieved values one-by-one (operator awaits value from ch2)
+			// if ch2 is closed before ch1 closes then panic occurs; add channel's status comparison to handle this case if trees have different length
+			return false //if any pair doesn't match then trees are not the same
 		}
 	}
+
+	//if all recieved values from ch1 matches corresponding values recieved from ch2,
+	//then trees are the same
+	return true
 }
